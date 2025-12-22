@@ -1,11 +1,20 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
             "type": "java",
             "name": "AIController",
             "request": "launch",
-            "mainClass": "AIController",
-            "projectName": "Muti-LanguageAIImageClassificationSystem_94de3473"
+            "mainClass": "ai.controller.AIController",
+            "projectName": "Muti-LanguageAIImageClassificationSystem_94de3473",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Python: Training",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/python/training/Training.py",
+            "console": "integratedTerminal"
         },
         {
             "name": "C/C++: gcc build and debug active file",

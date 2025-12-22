@@ -1,0 +1,46 @@
+openapi: 3.0.0
+info:
+  title: AI Image Classification API
+  version: 1.0.0
+  description: Multi-language API for AI image classification
+
+paths:
+  /classify:
+    post:
+      summary: Classify an image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Classification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class:
+                    type: string
+                  confidence:
+                    type: number
+                    format: float
+
+  /models:
+    get:
+      summary: List available models
+      responses:
+        '200':
+          description: List of models
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string

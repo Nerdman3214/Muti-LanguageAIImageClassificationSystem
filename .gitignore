@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.venv
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# C++
+build/
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dSYM/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Java
+target/
+.classpath
+.project
+.settings/
+*.class
+*.jar
+.gradle/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Models and data
+*.h5
+*.onnx
+*.pb
+*.pth
+*.weights
+
+# Build artifacts
+/cpp/build/
+*.so
+*.a
