@@ -1,21 +1,16 @@
 {
     "version": "0.2.0",
     "configurations": [
-        {
-            "type": "java",
-            "name": "AIController",
-            "request": "launch",
-            "mainClass": "ai.controller.AIController",
-            "projectName": "MultiLanguageAIImageSystem"
-        },
+        
+
         {
             "name": "C++: Debug InferenceEngine",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/cpp/build/InferenceEngine",
             "args": [
-                "${workspaceFolder}/models/digit_model.h5",
-                "test_image.jpg"
+                "${workspaceFolder}/models/resnet50_imagenet.onnx",
+                "${workspaceFolder}/test_images/cat.jpg"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -27,75 +22,39 @@
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
                 }
             ],
+            "preLaunchTask": "Build C++ Project (CMake)",
             "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "type": "java",
-            "name": "AIController",
-            "request": "launch",
-            "mainClass": "ai.controller.AIController",
-            "projectName": "Muti-LanguageAIImageClassificationSystem_94de3473",
-            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Python: Training",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/python/training/Training.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
-            "name": "C/C++: gcc build and debug active file",
-            "type": "cppdbg",
+            "name": "Python: Export ONNX",
+            "type": "python",
             "request": "launch",
-            "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-            "preLaunchTask": "C/C++: gcc build active file",
-            "miDebuggerPath": "/usr/bin/gdb"
+            "program": "${workspaceFolder}/python/export/export_imagenet_resnet50_to_onnx.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
-            "name": "(gdb) Launch",
-            "type": "cppdbg",
+            "type": "java",
+            "name": "Java: AIController REST API",
             "request": "launch",
-            "program": "enter program name, for example ${workspaceFolder}/a.out",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
+            "mainClass": "ai.controller.AIController",
+            "projectName": "Muti-LanguageAIImageClassificationSystem_94de3473",
+            "cwd": "${workspaceFolder}"
         }
-    ],
-    "version": "2.0.0"
+    ]
 }

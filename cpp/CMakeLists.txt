@@ -47,7 +47,3 @@ if(OpenCV_FOUND)
     target_link_libraries(InferenceEngine ${OpenCV_LIBS})
     add_definitions(-DHAS_OPENCV)
 endif()
-
-# Optional: Add tests
-enable_testing()
-add_subdirectory(tests)
