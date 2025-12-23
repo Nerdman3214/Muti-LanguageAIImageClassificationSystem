@@ -23,4 +23,15 @@ namespace SoftmaxUtils {
     std::vector<int> topk(const std::vector<float>& scores, int k);
 }
 
+// Alias for compatibility
+namespace Softmax {
+    inline std::vector<float> compute(const std::vector<float>& logits) {
+        return SoftmaxUtils::softmax(logits);
+    }
+    
+    inline std::vector<int> topK(const std::vector<float>& scores, int k) {
+        return SoftmaxUtils::topk(scores, k);
+    }
+}
+
 #endif // SOFTMAX_HPP

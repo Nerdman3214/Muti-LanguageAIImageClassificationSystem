@@ -6,6 +6,36 @@
             "name": "AIController",
             "request": "launch",
             "mainClass": "ai.controller.AIController",
+            "projectName": "MultiLanguageAIImageSystem"
+        },
+        {
+            "name": "C++: Debug InferenceEngine",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/cpp/build/InferenceEngine",
+            "args": [
+                "${workspaceFolder}/models/digit_model.h5",
+                "test_image.jpg"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "type": "java",
+            "name": "AIController",
+            "request": "launch",
+            "mainClass": "ai.controller.AIController",
             "projectName": "Muti-LanguageAIImageClassificationSystem_94de3473",
             "cwd": "${workspaceFolder}"
         },

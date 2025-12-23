@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 /**
  * Image processing utilities
@@ -35,6 +36,18 @@ namespace ImageUtils {
      */
     bool resizeImage(const std::string& inputPath, const std::string& outputPath,
                     int width, int height);
+    
+    /**
+     * Load image from file into raw byte array
+     * @param imagePath Path to the image file
+     * @param imageData Output buffer for pixel data (RGB format)
+     * @param width Output width of loaded image
+     * @param height Output height of loaded image
+     * @return true if successful
+     */
+    bool loadImage(const std::string& imagePath, 
+                   std::vector<uint8_t>& imageData,
+                   int& width, int& height);
 }
 
 #endif // IMAGE_UTILS_HPP

@@ -1,12 +1,9 @@
 #ifndef INFERENCE_ENGINE_H
 #define INFERENCE_ENGINE_H
 
-#include <vector>
+// Legacy header - redirects to new hpp header
+// Keep this for backward compatibility with JNI code
 
-class InferenceEngine {
-public:
-    std::vector<float> softmax(const std::vector<float>& logits);
-    int predict(const std::vector<float>& logits);
-};
+#include "InferenceEngine.hpp"
 
 #endif

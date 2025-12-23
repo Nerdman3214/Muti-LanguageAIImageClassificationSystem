@@ -130,12 +130,22 @@ Why ONNX?
 This ONNX file is what your C++ inference engine will load.
 """
 
+import os
+
+# Determine output path - save to models directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(script_dir))
+output_path = os.path.join(project_root, "models", "resnet50_imagenet.onnx")
+
+# Ensure models directory exists
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
 torch.onnx.export(
     model,
     dummy_input,
-    "resnet50_imagenet.onnx",
+    output_path,
     export_params=True,        # store trained weights
-    opset_version=11,          # stable ONNX opset
+    opset_version=17,          # use newer stable ONNX opset
     do_constant_folding=True,  # optimize graph
     input_names=["input"],
     output_names=["logits"],
@@ -145,4 +155,4 @@ torch.onnx.export(
     }
 )
 
-print("✅ ResNet-50 ImageNet model exported to resnet50_imagenet.onnx")
+print(f"✅ ResNet-50 ImageNet model exported to {output_path}")

@@ -7,6 +7,12 @@
 
 /**
  * InferenceEngine - Main C++ class for AI model inference
+ * 
+ * Supports:
+ * - ONNX model loading
+ * - ImageNet classification
+ * - Top-K predictions
+ * - Legacy JNI compatibility
  */
 class InferenceEngine {
 public:
@@ -15,7 +21,7 @@ public:
 
     /**
      * Initialize the engine with a model
-     * @param modelPath Path to the model file
+     * @param modelPath Path to the ONNX model file
      * @return true if successful
      */
     bool initialize(const std::string& modelPath);
@@ -29,7 +35,7 @@ public:
 
     /**
      * Get number of classes
-     * @return Number of output classes
+     * @return Number of output classes (1000 for ImageNet)
      */
     int getNumClasses() const;
 
@@ -46,6 +52,24 @@ public:
      * @return Version string
      */
     std::string getVersion() const;
+    
+    // ============================================
+    // Legacy API (for JNI compatibility)
+    // ============================================
+    
+    /**
+     * Apply softmax to logits
+     * @param logits Raw model output
+     * @return Probabilities
+     */
+    std::vector<float> softmax(const std::vector<float>& logits);
+    
+    /**
+     * Get predicted class from logits
+     * @param logits Raw model output
+     * @return Index of highest probability class
+     */
+    int predict(const std::vector<float>& logits);
 
 private:
     struct Impl;
