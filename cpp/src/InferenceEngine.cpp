@@ -132,10 +132,28 @@ bool InferenceEngine::initialize(const std::string& modelPath) {
         pImpl->loadLabels(labelsPath);
         
 #ifdef HAS_ONNXRUNTIME
-        // Create ONNX Runtime session
+        // Create ONNX Runtime session with GPU support
         Ort::SessionOptions sessionOptions;
+        
+        // Try to enable CUDA GPU acceleration
+        try {
+            OrtCUDAProviderOptions cuda_options;
+            cuda_options.device_id = 0;
+            cuda_options.arena_extend_strategy = 0;
+            cuda_options.gpu_mem_limit = 2ULL * 1024 * 1024 * 1024;  // 2GB limit
+            cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchExhaustive;
+            cuda_options.do_copy_in_default_stream = 1;
+            
+            sessionOptions.AppendExecutionProvider_CUDA(cuda_options);
+            std::cout << "CUDA execution provider enabled" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "CUDA not available, falling back to CPU: " << e.what() << std::endl;
+        }
+        
+        // Performance tuning
         sessionOptions.SetIntraOpNumThreads(4);
         sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+        sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
         
         pImpl->session = std::make_unique<Ort::Session>(
             pImpl->env, modelPath.c_str(), sessionOptions

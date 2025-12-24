@@ -1,9 +1,9 @@
 #include "ImageUtils.hpp"
-#include <vector>
-#include <stdexcept>
-#include <fstream>
 #include <iostream>
-#include <cstring>
+#include <fstream>
+#include <stdexcept>
+#include <algorithm>
+#include <cmath>
 
 #ifdef HAS_OPENCV
 #include <opencv2/opencv.hpp>
@@ -11,128 +11,129 @@
 
 namespace ImageUtils {
 
-std::vector<float> loadAndPreprocessImage(const std::string& imagePath, 
-                                         int width, int height) {
+std::vector<float> loadAndPreprocessImage(
+    const std::string& imagePath,
+    int targetWidth,
+    int targetHeight
+) {
 #ifdef HAS_OPENCV
+    // Step 1: Load image
     cv::Mat img = cv::imread(imagePath);
     if (img.empty()) {
-        throw std::runtime_error("Could not load image: " + imagePath);
+        throw std::runtime_error("Failed to load image: " + imagePath);
     }
-    
-    // Resize
+
+    // Step 2: Convert BGR to RGB (OpenCV loads as BGR)
+    cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+
+    // Step 3: Resize with high-quality interpolation
     cv::Mat resized;
-    cv::resize(img, resized, cv::Size(width, height));
-    
-    // Convert to float and normalize
-    std::vector<float> result(width * height * 3);
-    
-    // ImageNet normalization
-    const float mean[] = {0.485f, 0.456f, 0.406f};
-    const float std_val[] = {0.229f, 0.224f, 0.225f};
-    
+    cv::resize(img, resized, cv::Size(targetWidth, targetHeight), 0, 0, cv::INTER_LINEAR);
+
+    // Step 4: Normalize with ImageNet statistics
+    const float mean[3] = {0.485f, 0.456f, 0.406f};  // RGB
+    const float std[3]  = {0.229f, 0.224f, 0.225f};
+
+    std::vector<float> tensor(3 * targetHeight * targetWidth);
+
+    // Convert HWC (OpenCV) to CHW (PyTorch/ONNX)
     for (int c = 0; c < 3; ++c) {
-        for (int h = 0; h < height; ++h) {
-            for (int w = 0; w < width; ++w) {
-                // OpenCV uses BGR, convert to RGB
-                int cv_c = 2 - c;
-                float pixel = resized.at<cv::Vec3b>(h, w)[cv_c] / 255.0f;
-                pixel = (pixel - mean[c]) / std_val[c];
-                result[c * height * width + h * width + w] = pixel;
+        for (int h = 0; h < targetHeight; ++h) {
+            for (int w = 0; w < targetWidth; ++w) {
+                int hwc_idx = h * targetWidth * 3 + w * 3 + c;
+                int chw_idx = c * targetHeight * targetWidth + h * targetWidth + w;
+                
+                // Normalize: (pixel/255 - mean) / std
+                float pixel = static_cast<float>(resized.data[hwc_idx]) / 255.0f;
+                tensor[chw_idx] = (pixel - mean[c]) / std[c];
             }
         }
     }
-    
-    return result;
+
+    return tensor;
+
 #else
-    // Placeholder when OpenCV not available
-    std::cerr << "Warning: OpenCV not available, returning placeholder image data" << std::endl;
-    std::vector<float> result(width * height * 3, 0.0f);
-    return result;
-#endif
-}
-
-std::vector<float> normalizeImage(const std::vector<uint8_t>& pixels) {
-    std::vector<float> normalized;
-    normalized.reserve(pixels.size());
-
-    for (uint8_t pixel : pixels) {
-        normalized.push_back(static_cast<float>(pixel) / 255.0f);
+    // Fallback: Simple PPM loader + nearest neighbor resize
+    std::vector<uint8_t> rawData;
+    int width, height;
+    
+    if (!loadImage(imagePath, rawData, width, height)) {
+        throw std::runtime_error("Failed to load image (OpenCV not available)");
     }
 
-    return normalized;
-}
+    const float mean[3] = {0.485f, 0.456f, 0.406f};
+    const float std[3]  = {0.229f, 0.224f, 0.225f};
 
-bool resizeImage(const std::string& inputPath, const std::string& outputPath,
-                int width, int height) {
-#ifdef HAS_OPENCV
-    cv::Mat img = cv::imread(inputPath);
-    if (img.empty()) return false;
-    
-    cv::Mat resized;
-    cv::resize(img, resized, cv::Size(width, height));
-    return cv::imwrite(outputPath, resized);
-#else
-    std::cerr << "Warning: OpenCV not available, cannot resize image" << std::endl;
-    return false;
-#endif
-}
+    std::vector<float> tensor(3 * targetHeight * targetWidth);
 
-bool loadImage(const std::string& imagePath, 
-               std::vector<uint8_t>& imageData,
-               int& width, int& height) {
-#ifdef HAS_OPENCV
-    cv::Mat img = cv::imread(imagePath);
-    if (img.empty()) {
-        std::cerr << "Failed to load image: " << imagePath << std::endl;
-        return false;
-    }
-    
-    width = img.cols;
-    height = img.rows;
-    
-    // Convert BGR to RGB and flatten
-    imageData.resize(width * height * 3);
-    for (int h = 0; h < height; ++h) {
-        for (int w = 0; w < width; ++w) {
-            cv::Vec3b pixel = img.at<cv::Vec3b>(h, w);
-            int idx = (h * width + w) * 3;
-            imageData[idx + 0] = pixel[2];  // R
-            imageData[idx + 1] = pixel[1];  // G
-            imageData[idx + 2] = pixel[0];  // B
+    for (int c = 0; c < 3; ++c) {
+        for (int h = 0; h < targetHeight; ++h) {
+            for (int w = 0; w < targetWidth; ++w) {
+                // Nearest neighbor mapping
+                int srcH = (h * height) / targetHeight;
+                int srcW = (w * width) / targetWidth;
+                int srcIdx = (srcH * width + srcW) * 3 + c;
+
+                float pixel = (srcIdx < static_cast<int>(rawData.size())) 
+                    ? rawData[srcIdx] / 255.0f 
+                    : 0.0f;
+
+                int dstIdx = c * targetHeight * targetWidth + h * targetWidth + w;
+                tensor[dstIdx] = (pixel - mean[c]) / std[c];
+            }
         }
     }
-    
+
+    return tensor;
+#endif
+}
+
+bool loadImage(
+    const std::string& imagePath,
+    std::vector<uint8_t>& imageData,
+    int& width,
+    int& height
+) {
+#ifdef HAS_OPENCV
+    cv::Mat img = cv::imread(imagePath);
+    if (img.empty()) return false;
+
+    cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+    width = img.cols;
+    height = img.rows;
+
+    imageData.resize(width * height * 3);
+    std::memcpy(imageData.data(), img.data, imageData.size());
     return true;
+
 #else
-    // Simple PPM loader for testing without OpenCV
+    // Simple PPM P6 loader
     std::ifstream file(imagePath, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Cannot open file: " << imagePath << std::endl;
-        // Return placeholder data for testing
+    if (!file) {
+        // Generate test pattern if file doesn't exist
         width = 224;
         height = 224;
-        imageData.resize(width * height * 3, 128);  // Gray placeholder
-        return true;  // Return true with placeholder for simulation mode
-    }
-    
-    std::string magic;
-    file >> magic;
-    
-    if (magic == "P6") {
-        file >> width >> height;
-        int maxVal;
-        file >> maxVal;
-        file.get();  // Skip whitespace
-        
-        imageData.resize(width * height * 3);
-        file.read(reinterpret_cast<char*>(imageData.data()), imageData.size());
+        imageData.resize(width * height * 3, 128);
         return true;
     }
-    
-    // Unknown format - return placeholder
-    width = 224;
-    height = 224;
-    imageData.resize(width * height * 3, 128);
+
+    std::string magic;
+    file >> magic;
+
+    if (magic != "P6") {
+        width = 224;
+        height = 224;
+        imageData.resize(width * height * 3, 128);
+        return true;
+    }
+
+    int maxval;
+    file >> width >> height >> maxval;
+    file.get(); // consume newline
+
+    imageData.resize(width * height * 3);
+    file.read(reinterpret_cast<char*>(imageData.data()), imageData.size());
+
     return true;
 #endif
 }

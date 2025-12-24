@@ -16,15 +16,16 @@ import java.util.*;
 import static spark.Spark.*;
 
 /**
- * AIController - REST API for Image Classification
+ * REST API Controller for ML Inference
  * 
- * Endpoints:
- * - POST /classify      : Classify an uploaded image
- * - GET  /health        : Health check endpoint
- * - GET  /info          : Get model information
+ * Design Pattern: Controller Pattern
+ * - Handles HTTP routing
+ * - Validates inputs
+ * - Delegates to native inference
  * 
- * This controller bridges Java with the C++ inference engine via JNI.
+ * OpenAPI/Swagger compatible
  */
+@Path("/api/v1")
 public class AIController {
     
     private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();

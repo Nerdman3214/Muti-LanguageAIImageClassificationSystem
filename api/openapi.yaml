@@ -1,13 +1,43 @@
 openapi: 3.0.0
 info:
-  title: AI Image Classification API
+  title: ML Inference API
   version: 1.0.0
-  description: Multi-language API for AI image classification
+  description: Production ML inference system with ONNX + CUDA
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
 
 paths:
-  /classify:
+  /init:
     post:
-      summary: Classify an image
+      summary: Initialize inference engine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                modelPath:
+                  type: string
+                  example: "/models/resnet50_imagenet.onnx"
+      responses:
+        '200':
+          description: Engine initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  version:
+                    type: string
+
+  /infer:
+    post:
+      summary: Run inference on image
       requestBody:
         required: true
         content:
@@ -20,27 +50,35 @@ paths:
                   format: binary
       responses:
         '200':
-          description: Classification result
+          description: Inference result
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   class:
-                    type: string
+                    type: integer
                   confidence:
                     type: number
-                    format: float
+                  engine:
+                    type: string
+                  device:
+                    type: string
+                  latency_ms:
+                    type: integer
 
-  /models:
+  /health:
     get:
-      summary: List available models
+      summary: Health check
       responses:
         '200':
-          description: List of models
+          description: Service is healthy
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: string
+                type: object
+                properties:
+                  status:
+                    type: string
+                  initialized:
+                    type: boolean
