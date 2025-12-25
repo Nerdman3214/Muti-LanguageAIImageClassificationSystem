@@ -1,6 +1,8 @@
 #include "InferenceEngine.hpp"
 #include <iostream>
 #include <chrono>
+#include <algorithm>
+#include <numeric>
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
@@ -34,7 +36,27 @@ int main(int argc, char* argv[]) {
         std::cout << "\n=== Results ===" << std::endl;
         std::cout << "Inference time: " << duration.count() << " ms" << std::endl;
         std::cout << "Number of classes: " << engine.getNumClasses() << std::endl;
-        std::cout << "Engine version: " << engine.getVersion() << std::endl;
+
+        // Print top-5 predictions
+        if (!results.empty()) {
+            // Create index vector and sort by probability
+            std::vector<size_t> indices(results.size());
+            std::iota(indices.begin(), indices.end(), 0);
+            std::sort(indices.begin(), indices.end(), [&results](size_t a, size_t b) {
+                return results[a] > results[b];
+            });
+
+            std::cout << "\nTop-5 Predictions:" << std::endl;
+            const auto& labels = engine.getLabels();
+            for (int i = 0; i < 5 && i < static_cast<int>(indices.size()); ++i) {
+                size_t idx = indices[i];
+                std::string label = (idx < labels.size()) ? labels[idx] : "Unknown";
+                std::cout << "  " << (i + 1) << ". " << label 
+                          << " (" << (results[idx] * 100.0f) << "%)" << std::endl;
+            }
+        }
+
+        std::cout << "\nEngine version: " << engine.getVersion() << std::endl;
 
         return 0;
     } catch (const std::exception& e) {

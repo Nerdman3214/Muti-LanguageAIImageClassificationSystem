@@ -10,7 +10,8 @@
  * 
  * Supports:
  * - ONNX model loading
- * - ImageNet classification
+ * - ImageNet classification (image input)
+ * - RL Policy inference (state vector input)
  * - Top-K predictions
  * - Legacy JNI compatibility
  */
@@ -25,6 +26,13 @@ public:
      * @return true if successful
      */
     bool initialize(const std::string& modelPath);
+    
+    /**
+     * Initialize the engine for RL policy inference
+     * @param modelPath Path to the ONNX policy model
+     * @return true if successful
+     */
+    bool initializeRL(const std::string& modelPath);
 
     /**
      * Classify an image
@@ -32,6 +40,13 @@ public:
      * @return Vector of probabilities for each class
      */
     std::vector<float> classifyImage(const std::string& imagePath);
+    
+    /**
+     * Run inference on a state vector (for RL policies)
+     * @param state State vector (e.g., [cart_pos, cart_vel, pole_angle, pole_vel])
+     * @return Vector of action logits or probabilities
+     */
+    std::vector<float> inferState(const std::vector<float>& state);
 
     /**
      * Get number of classes
@@ -70,6 +85,12 @@ public:
      * @return Index of highest probability class
      */
     int predict(const std::vector<float>& logits);
+
+    /**
+     * Get class labels
+     * @return Vector of label names (1000 for ImageNet)
+     */
+    const std::vector<std::string>& getLabels() const;
 
 private:
     struct Impl;

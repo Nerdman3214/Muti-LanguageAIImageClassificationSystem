@@ -199,6 +199,83 @@ bool InferenceEngine::initialize(const std::string& modelPath) {
     }
 }
 
+// ============================================
+// RL Policy Initialization
+// ============================================
+
+bool InferenceEngine::initializeRL(const std::string& modelPath) {
+    try {
+        pImpl->modelPath = modelPath;
+        std::cout << "Initializing RL policy engine with model: " << modelPath << std::endl;
+        
+#ifdef HAS_ONNXRUNTIME
+        // Create ONNX Runtime session for RL policy
+        Ort::SessionOptions sessionOptions;
+        
+        // Try to enable CUDA GPU acceleration
+        try {
+            OrtCUDAProviderOptions cuda_options;
+            cuda_options.device_id = 0;
+            cuda_options.arena_extend_strategy = 0;
+            cuda_options.gpu_mem_limit = 2ULL * 1024 * 1024 * 1024;
+            cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchExhaustive;
+            cuda_options.do_copy_in_default_stream = 1;
+            
+            sessionOptions.AppendExecutionProvider_CUDA(cuda_options);
+            std::cout << "CUDA execution provider enabled for RL" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "CUDA not available for RL, falling back to CPU: " << e.what() << std::endl;
+        }
+        
+        // Performance tuning
+        sessionOptions.SetIntraOpNumThreads(2);
+        sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+        sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+        
+        pImpl->session = std::make_unique<Ort::Session>(
+            pImpl->env, modelPath.c_str(), sessionOptions
+        );
+        
+        std::cout << "ONNX Runtime RL session created successfully" << std::endl;
+        
+        // Get input dimensions from model (expecting [batch, state_dim])
+        auto inputInfo = pImpl->session->GetInputTypeInfo(0);
+        auto tensorInfo = inputInfo.GetTensorTypeAndShapeInfo();
+        auto inputShape = tensorInfo.GetShape();
+        
+        if (inputShape.size() >= 2) {
+            // For RL: store state dimension in inputWidth
+            pImpl->inputWidth = inputShape[1];  // state_dim
+            pImpl->inputHeight = 1;
+            pImpl->inputChannels = 1;
+        }
+        
+        // Get number of actions
+        auto outputInfo = pImpl->session->GetOutputTypeInfo(0);
+        auto outputTensorInfo = outputInfo.GetTensorTypeAndShapeInfo();
+        auto outputShape = outputTensorInfo.GetShape();
+        
+        if (outputShape.size() >= 2) {
+            pImpl->numClasses = outputShape[1];  // num_actions
+        }
+        
+        std::cout << "RL Model loaded: " << modelPath << std::endl;
+        std::cout << "State dimension: " << pImpl->inputWidth << std::endl;
+        std::cout << "Number of actions: " << pImpl->numClasses << std::endl;
+#else
+        std::cout << "Note: ONNX Runtime not available, using simulation mode for RL" << std::endl;
+        pImpl->numClasses = 2;  // CartPole has 2 actions
+#endif
+        
+        pImpl->initialized = true;
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to initialize RL engine: " << e.what() << std::endl;
+        return false;
+    }
+}
+
 std::vector<float> InferenceEngine::classifyImage(const std::string& imagePath) {
     if (!pImpl->initialized) {
         throw std::runtime_error("Engine not initialized. Call initialize() first.");
@@ -307,6 +384,10 @@ std::string InferenceEngine::getVersion() const {
     return "1.0.0";
 }
 
+const std::vector<std::string>& InferenceEngine::getLabels() const {
+    return pImpl->labels;
+}
+
 // Legacy API support (for JNI compatibility)
 std::vector<float> InferenceEngine::softmax(const std::vector<float>& logits) {
     return Softmax::compute(logits);
@@ -315,4 +396,80 @@ std::vector<float> InferenceEngine::softmax(const std::vector<float>& logits) {
 int InferenceEngine::predict(const std::vector<float>& logits) {
     auto probs = softmax(logits);
     return static_cast<int>(std::max_element(probs.begin(), probs.end()) - probs.begin());
+}
+
+// ============================================
+// RL Policy Inference (for CartPole, etc.)
+// ============================================
+
+std::vector<float> InferenceEngine::inferState(const std::vector<float>& state) {
+    std::cout << "Running RL state inference on " << state.size() << "-dim state" << std::endl;
+    
+#ifdef HAS_ONNXRUNTIME
+    if (!pImpl->initialized) {
+        throw std::runtime_error("Engine not initialized. Call initialize() first.");
+    }
+    
+    // Create input tensor from state vector
+    std::array<int64_t, 2> inputShape = {1, static_cast<int64_t>(state.size())};
+    
+    std::vector<float> inputData = state;  // Copy for non-const
+    
+    Ort::Value inputOrt = Ort::Value::CreateTensor<float>(
+        pImpl->memoryInfo,
+        inputData.data(),
+        inputData.size(),
+        inputShape.data(),
+        inputShape.size()
+    );
+    
+    // Run inference - use "state" and "action_logits" for RL models
+    const char* inputNames[] = {"state"};
+    const char* outputNames[] = {"action_logits"};
+    
+    try {
+        auto outputTensors = pImpl->session->Run(
+            Ort::RunOptions{nullptr},
+            inputNames, &inputOrt, 1,
+            outputNames, 1
+        );
+        
+        // Get output
+        float* outputData = outputTensors[0].GetTensorMutableData<float>();
+        auto outputShape = outputTensors[0].GetTensorTypeAndShapeInfo().GetShape();
+        size_t outputSize = outputShape[1];
+        
+        std::vector<float> logits(outputData, outputData + outputSize);
+        
+        std::cout << "  Output logits: [";
+        for (size_t i = 0; i < logits.size(); ++i) {
+            std::cout << logits[i];
+            if (i < logits.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]" << std::endl;
+        
+        return logits;
+        
+    } catch (const Ort::Exception& e) {
+        std::cerr << "ONNX Runtime error: " << e.what() << std::endl;
+        throw std::runtime_error(std::string("RL inference failed: ") + e.what());
+    }
+#else
+    // Simulation mode - return random action logits for 2 actions (left/right)
+    std::cout << "  (Simulation mode - returning dummy logits)" << std::endl;
+    
+    // Simple simulation: prefer action 1 (right) if pole leaning right (positive angle)
+    float angle = (state.size() >= 3) ? state[2] : 0.0f;
+    
+    std::vector<float> logits(2);
+    if (angle > 0) {
+        logits[0] = -0.5f;  // left
+        logits[1] = 0.5f;   // right
+    } else {
+        logits[0] = 0.5f;   // left
+        logits[1] = -0.5f;  // right
+    }
+    
+    return logits;
+#endif
 }

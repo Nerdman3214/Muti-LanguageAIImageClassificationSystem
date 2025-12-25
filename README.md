@@ -1,86 +1,233 @@
 # Multi-Language AI Image Classification System
 
-A sophisticated multi-language AI image classification system combining Python training, C++ inference optimization, and Java API exposure through JNI.
+A production-ready multi-language AI image classification system that **trains models in Python, exports to ONNX, runs high-performance inference in C++, and exposes a REST API via Java/JNI**.
 
-## Project Overview
+## 🎯 Project Overview
 
-This system provides:
-- **Python**: Model training and export capabilities
-- **C++**: High-performance inference engine with optimized image processing
-- **Java**: API layer for integration into Java-based applications
-- **JNI**: Bridge between Java and C++ for native performance
+This system demonstrates professional multi-language ML engineering:
 
-## Project Structure
+| Language | Responsibility | Key Files |
+|----------|---------------|-----------|
+| **Python** | Training & ONNX export | `python/training/`, `python/export/` |
+| **C++** | High-performance inference | `cpp/src/InferenceEngine.cpp` |
+| **Java** | REST API & application layer | `java/src/.../AIController.java` |
+| **JNI** | Native bridge (thin layer) | `jni/InferenceJNI.cpp` |
+
+## 🏗️ Architecture
 
 ```
-MultiLanguageAIImageSystem/
-├── python/          # Python training and utilities
-├── cpp/             # C++ inference engine
-├── java/            # Java API and controller
-├── jni/             # Java Native Interface bindings
-├── models/          # Pre-trained models and labels
-├── api/             # API specifications
-├── scripts/         # Build and deployment scripts
-└── .vscode/         # VS Code configuration
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENT                                  │
+│                    (curl, browser, app)                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ HTTP POST /classify
+┌─────────────────────────────────────────────────────────────────┐
+│                      JAVA REST API                              │
+│                    (AIController.java)                          │
+│                  • Spark HTTP server                            │
+│                  • File upload handling                         │
+│                  • JSON response formatting                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ JNI call: nativeInfer(imagePath)
+┌─────────────────────────────────────────────────────────────────┐
+│                      JNI BRIDGE                                 │
+│                   (InferenceJNI.cpp)                            │
+│                  • String conversion                            │
+│                  • Exception handling                           │
+│                  • Singleton engine management                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ C++ method call
+┌─────────────────────────────────────────────────────────────────┐
+│                   C++ INFERENCE ENGINE                          │
+│                  (InferenceEngine.cpp)                          │
+│                  • ONNX Runtime session                         │
+│                  • OpenCV image preprocessing                   │
+│                  • ImageNet normalization                       │
+│                  • Softmax (numerically stable)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ ONNX Runtime inference
+┌─────────────────────────────────────────────────────────────────┐
+│                      ONNX MODEL                                 │
+│               (resnet50_imagenet.onnx)                          │
+│                  • 1000 ImageNet classes                        │
+│                  • 224×224×3 input                              │
+│                  • ~25M parameters                              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Requirements
+## 📁 Project Structure
 
-- Python 3.7+
-- C++ 17
-- Java 21+
-- CMake 3.10+
-- GCC/G++ or Clang
+```
+Muti-LanguageAIImageClassificationSystem/
+├── python/
+│   ├── training/Training.py          # Model training
+│   ├── export/export_*.py            # ONNX export scripts
+│   └── requirements.txt
+├── cpp/
+│   ├── include/
+│   │   ├── InferenceEngine.hpp       # Main engine interface
+│   │   ├── Softmax.hpp               # Numerically stable softmax
+│   │   └── ImageUtils.hpp            # Image preprocessing
+│   ├── src/
+│   │   ├── InferenceEngine.cpp       # ONNX Runtime inference
+│   │   ├── Softmax.cpp               # Softmax implementation
+│   │   ├── ImageUtils.cpp            # OpenCV preprocessing
+│   │   └── main.cpp                  # CLI demo
+│   └── CMakeLists.txt
+├── jni/
+│   └── InferenceJNI.cpp              # JNI bridge (thin layer)
+├── java/
+│   ├── src/main/java/ai/controller/
+│   │   └── AIController.java         # REST API server
+│   └── pom.xml
+├── models/
+│   ├── resnet50_imagenet.onnx        # Pre-trained model
+│   └── labels_imagenet.txt           # 1000 class labels
+├── test_images/                      # Test images
+├── scripts/                          # Build scripts
+└── README.md
+```
 
-## Building
+## 🚀 Quick Start
 
-### Python Dependencies
+### Prerequisites
+
+- **Python 3.8+** with TensorFlow (training only)
+- **C++17** compiler (g++ 9+)
+- **Java 11+** with Maven
+- **CMake 3.10+**
+- **OpenCV 4.x**
+- **ONNX Runtime 1.19+**
+
+### 1. Download ONNX Runtime
 
 ```bash
-pip install -r python/requirements.txt
+wget https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/onnxruntime-linux-x64-1.19.2.tgz
+tar -xzf onnxruntime-linux-x64-1.19.2.tgz -C /opt/
+export ONNXRUNTIME_ROOT=/opt/onnxruntime-linux-x64-1.19.2
 ```
 
-### C++ Build
+### 2. Build C++ Engine
 
 ```bash
-bash scripts/build_cpp.sh
+cd cpp
+mkdir build && cd build
+ONNXRUNTIME_ROOT=/opt/onnxruntime-linux-x64-1.19.2 cmake ..
+make -j
 ```
 
-### Java Build
+### 3. Build Java API
 
 ```bash
-bash scripts/build_java.sh
+cd java
+mvn clean package -DskipTests
 ```
 
-## Usage
-
-### Python
-
-```python
-# Training and export
-python python/training/Training.py
-
-# Export to ONNX
-python python/export/export_imagenet_resnet50_to_onnx.py
-```
-
-### C++
+### 4. Run C++ CLI Demo
 
 ```bash
-./cpp/build/InferenceEngine <model_path> <image_path>
+LD_LIBRARY_PATH=/opt/onnxruntime-linux-x64-1.19.2/lib:cpp/build \
+./cpp/build/InferenceEngine models/resnet50_imagenet.onnx test_images/dog.jpg
 ```
 
-### Java
-
-```java
-AIController controller = new AIController();
-// Use native inference through JNI
+Expected output:
+```
+Top-5 Predictions:
+  1. Golden Retriever (57.19%)
+  2. Kuvasz (10.53%)
+  3. Pyrenean Mountain Dog (8.65%)
+  4. Labrador Retriever (8.50%)
+  5. Cocker Spaniels (6.61%)
 ```
 
-## Development
+### 5. Run Java REST API
 
-See `.vscode/settings.json` and `.vscode/launch.json` for debugging configurations.
+```bash
+LD_LIBRARY_PATH=/opt/onnxruntime-linux-x64-1.19.2/lib:cpp/build \
+java -Djava.library.path=cpp/build \
+     -jar java/target/MultiLanguageAIImageSystem-1.0.0.jar
+```
 
-## License
+Test the API:
+```bash
+curl -X POST -F "image=@test_images/dog.jpg" http://localhost:8080/classify | jq .
+```
 
-[Your License Here]
+## 🔬 Technical Details
+
+### Softmax Implementation (Numerically Stable)
+
+```cpp
+// Subtract max to prevent overflow
+float maxVal = *std::max_element(logits.begin(), logits.end());
+for (float& val : shifted) val = std::exp(val - maxVal);
+// Normalize
+float sum = std::accumulate(shifted.begin(), shifted.end(), 0.0f);
+for (float& val : result) val /= sum;
+```
+
+### ImageNet Preprocessing
+
+- Resize to 224×224
+- Convert BGR→RGB
+- Normalize: `(pixel/255 - mean) / std`
+  - mean = [0.485, 0.456, 0.406]
+  - std = [0.229, 0.224, 0.225]
+- Convert HWC→CHW format
+
+### JNI Bridge Pattern
+
+```cpp
+extern "C" {
+JNIEXPORT jfloatArray JNICALL
+Java_ai_controller_AIController_nativeInfer(JNIEnv* env, jobject, jstring imagePath) {
+    // 1. Convert Java string → C++ string
+    // 2. Call InferenceEngine::classifyImage()
+    // 3. Convert C++ vector → Java float[]
+    // 4. Handle exceptions → Java exceptions
+}
+}
+```
+
+## 📊 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/classify` | Upload and classify an image |
+| GET | `/health` | Health check |
+| GET | `/info` | Model information |
+
+### Example Response
+
+```json
+{
+  "status": "success",
+  "imageName": "dog.jpg",
+  "predictions": [
+    {"classIndex": 207, "label": "Golden Retriever", "confidence": 0.5719},
+    {"classIndex": 222, "label": "Kuvasz", "confidence": 0.1053}
+  ],
+  "inferenceTimeMs": 131,
+  "modelVersion": "1.0.0"
+}
+```
+
+## ✅ Submission Checklist
+
+- [x] Python = training only (no inference)
+- [x] C++ = inference only (no training)
+- [x] Java = API layer (no model loading)
+- [x] JNI = thin bridge (no business logic)
+- [x] ONNX = single model format
+- [x] No TensorFlow in C++
+- [x] Softmax sums to 1.0
+- [x] Both CLI and REST demos work
+- [x] README with architecture diagram
+
+## 📜 License
+
+MIT License

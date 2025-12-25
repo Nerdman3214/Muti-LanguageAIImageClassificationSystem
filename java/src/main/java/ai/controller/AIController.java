@@ -48,6 +48,7 @@ public class AIController {
     
     // Native methods (JNI)
     public native float[] nativeInfer(String imagePath);
+    public native float[] nativeInferState(float[] state);  // RL policy inference
     
     /**
      * Classification result structure
@@ -94,12 +95,25 @@ public class AIController {
         }
     }
     
-    // ImageNet labels (top 10 for demo)
-    private static final String[] IMAGENET_LABELS = {
-        "tench", "goldfish", "great white shark", "tiger shark", "hammerhead shark",
-        "electric ray", "stingray", "rooster", "hen", "ostrich"
-        // In production, load all 1000 labels from file
-    };
+    // ImageNet labels - loaded from file
+    private static String[] IMAGENET_LABELS;
+    
+    static {
+        // Load labels from file
+        try {
+            java.util.List<String> lines = java.nio.file.Files.readAllLines(
+                java.nio.file.Paths.get("models/labels_imagenet.txt"));
+            IMAGENET_LABELS = lines.toArray(new String[0]);
+            System.out.println("✅ Loaded " + IMAGENET_LABELS.length + " ImageNet labels");
+        } catch (Exception e) {
+            System.err.println("⚠️ Could not load labels file: " + e.getMessage());
+            // Fallback labels
+            IMAGENET_LABELS = new String[]{
+                "tench", "goldfish", "great white shark", "tiger shark", "hammerhead shark",
+                "electric ray", "stingray", "rooster", "hen", "ostrich"
+            };
+        }
+    }
     
     /**
      * Main entry point - starts the REST server
@@ -132,7 +146,7 @@ public class AIController {
         });
         
         // ============================================
-        // REST Endpoints
+        // REST Endpoints - Image Classification
         // ============================================
         
         /**
@@ -153,6 +167,30 @@ public class AIController {
          */
         get("/info", this::handleInfo);
         
+        // ============================================
+        // REST Endpoints - Reinforcement Learning
+        // ============================================
+        
+        /**
+         * POST /rl/action
+         * Get action from RL policy given state
+         * Body: {"state": [0.0, 0.0, 0.1, 0.0]}
+         */
+        post("/rl/action", this::handleRLAction);
+        
+        /**
+         * POST /rl/qvalues
+         * Get Q-values for all actions given state
+         * Body: {"state": [0.0, 0.0, 0.1, 0.0]}
+         */
+        post("/rl/qvalues", this::handleRLQValues);
+        
+        /**
+         * GET /rl/info
+         * Get RL policy information
+         */
+        get("/rl/info", this::handleRLInfo);
+        
         /**
          * GET /
          * Welcome page
@@ -170,12 +208,17 @@ public class AIController {
         });
         
         System.out.println("╔════════════════════════════════════════════════════════════╗");
-        System.out.println("║   🚀 AI Image Classification API Server Started            ║");
+        System.out.println("║   🚀 Multi-Language AI API Server Started                  ║");
         System.out.println("║                                                            ║");
-        System.out.println("║   Endpoints:                                               ║");
+        System.out.println("║   Image Classification Endpoints:                          ║");
         System.out.println("║   • POST /classify  - Upload and classify an image         ║");
         System.out.println("║   • GET  /health    - Health check                         ║");
         System.out.println("║   • GET  /info      - Model information                    ║");
+        System.out.println("║                                                            ║");
+        System.out.println("║   Reinforcement Learning Endpoints:                        ║");
+        System.out.println("║   • POST /rl/action   - Get action from policy             ║");
+        System.out.println("║   • POST /rl/qvalues  - Get Q-values for state             ║");
+        System.out.println("║   • GET  /rl/info     - RL policy information              ║");
         System.out.println("║                                                            ║");
         System.out.println("║   Server running on: http://localhost:" + PORT + "                ║");
         System.out.println("╚════════════════════════════════════════════════════════════╝");
@@ -413,4 +456,104 @@ public class AIController {
             </html>
             """;
     }
+    
+    // ============================================
+    // Reinforcement Learning Handlers
+    // ============================================
+    
+    /**
+     * Handle RL action request
+     * POST /rl/action
+     * Body: {"state": [0.0, 0.0, 0.1, 0.0]}
+     */
+    private String handleRLAction(Request req, Response res) {
+        res.type("application/json");
+        
+        try {
+            // Parse state from JSON body
+            RLRequest rlReq = gson.fromJson(req.body(), RLRequest.class);
+            
+            if (rlReq == null || rlReq.state == null) {
+                res.status(400);
+                return gson.toJson(new ErrorResponse("Missing 'state' array in request body"));
+            }
+            
+            // Get action from RL service
+            RLInferenceService rlService = RLInferenceService.getInstance();
+            RLInferenceService.PolicyResult result = rlService.getAction(rlReq.state);
+            
+            return gson.toJson(result);
+            
+        } catch (Exception e) {
+            res.status(500);
+            return gson.toJson(new ErrorResponse("RL inference failed: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Handle RL Q-values request
+     * POST /rl/qvalues
+     * Body: {"state": [0.0, 0.0, 0.1, 0.0]}
+     */
+    private String handleRLQValues(Request req, Response res) {
+        res.type("application/json");
+        
+        try {
+            RLRequest rlReq = gson.fromJson(req.body(), RLRequest.class);
+            
+            if (rlReq == null || rlReq.state == null) {
+                res.status(400);
+                return gson.toJson(new ErrorResponse("Missing 'state' array in request body"));
+            }
+            
+            RLInferenceService rlService = RLInferenceService.getInstance();
+            RLInferenceService.QValueResult result = rlService.getQValues(rlReq.state);
+            
+            return gson.toJson(result);
+            
+        } catch (Exception e) {
+            res.status(500);
+            return gson.toJson(new ErrorResponse("Q-value query failed: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Handle RL info request
+     * GET /rl/info
+     */
+    private String handleRLInfo(Request req, Response res) {
+        res.type("application/json");
+        
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("name", "CartPole Policy Engine");
+        info.put("algorithm", "REINFORCE (Policy Gradient)");
+        info.put("stateDim", 4);
+        info.put("stateDescription", Arrays.asList(
+            "cart_position",
+            "cart_velocity", 
+            "pole_angle",
+            "pole_angular_velocity"
+        ));
+        info.put("actionDim", 2);
+        info.put("actions", Arrays.asList("push_left", "push_right"));
+        info.put("endpoints", Arrays.asList(
+            "POST /rl/action - Get action from policy given state",
+            "POST /rl/qvalues - Get Q-values for all actions",
+            "GET /rl/info - This endpoint"
+        ));
+        info.put("example", Map.of(
+            "request", Map.of("state", Arrays.asList(0.0, 0.0, 0.1, 0.0)),
+            "description", "Pole tilted 0.1 rad right"
+        ));
+        
+        return gson.toJson(info);
+    }
+    
+    /**
+     * Request body for RL endpoints
+     */
+    private static class RLRequest {
+        public float[] state;
+    }
 }
+
