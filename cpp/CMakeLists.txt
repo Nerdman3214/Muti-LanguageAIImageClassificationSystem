@@ -4,6 +4,10 @@ project(InferenceEngine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Explicitly exclude Python venv from any include search
+set(CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES 
+    ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+
 # ============================================
 # CRITICAL FIX: Find JNI (Java Native Interface)
 # ============================================
@@ -19,12 +23,6 @@ endif()
 # For manual installation, set ONNXRUNTIME_ROOT
 if(DEFINED ENV{ONNXRUNTIME_ROOT})
     set(ONNXRUNTIME_ROOT $ENV{ONNXRUNTIME_ROOT})
-endif()
-
-if(ONNXRUNTIME_ROOT)
-    include_directories(${ONNXRUNTIME_ROOT}/include)
-    link_directories(${ONNXRUNTIME_ROOT}/lib)
-    message(STATUS "ONNX Runtime: ${ONNXRUNTIME_ROOT}")
 endif()
 
 # Find OpenCV for image loading
@@ -47,49 +45,53 @@ set(SOURCES
     src/ImageUtils.cpp
 )
 
-# Create shared library (for linking with JNI)
-add_library(inference_engine SHARED ${SOURCES})
-
-# Create executable
-add_executable(InferenceEngine src/main.cpp ${SOURCES})
-
-# ============================================
-# NEW: JNI Shared Library (libinference_jni.so)
-# ============================================
-add_library(inference_jni SHARED
+set(JNI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../jni/InferenceJNI.cpp
-    ${SOURCES}
 )
 
+# Create shared library (used by Java JNI loader)
+add_library(inference_engine SHARED ${SOURCES} ${JNI_SOURCES})
+set_target_properties(inference_engine PROPERTIES OUTPUT_NAME inference_engine)
+
+# Create CLI executable linked against the shared library
+add_executable(InferenceEngine src/main.cpp)
+target_link_libraries(InferenceEngine PRIVATE inference_engine)
+
+target_include_directories(inference_engine PRIVATE ${JNI_INCLUDE_DIRS})
+target_link_libraries(inference_engine PRIVATE ${JNI_LIBRARIES})
+
 # Link ONNX Runtime if available
-if(EXISTS "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
-    target_link_libraries(inference_engine onnxruntime)
-    target_link_libraries(InferenceEngine onnxruntime)
-    target_link_libraries(inference_jni onnxruntime)
+find_package(onnxruntime QUIET CONFIG)
+if(onnxruntime_FOUND)
+    if(TARGET onnxruntime::onnxruntime)
+        target_link_libraries(inference_engine PRIVATE onnxruntime::onnxruntime)
+    else()
+        target_link_libraries(inference_engine PRIVATE onnxruntime)
+    endif()
     target_compile_definitions(inference_engine PRIVATE HAS_ONNXRUNTIME)
-    target_compile_definitions(InferenceEngine PRIVATE HAS_ONNXRUNTIME)
-    target_compile_definitions(inference_jni PRIVATE HAS_ONNXRUNTIME)
-    message(STATUS "ONNX Runtime linked")
+    message(STATUS "ONNX Runtime linked via package")
+elseif(ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
+    target_include_directories(inference_engine PRIVATE ${ONNXRUNTIME_ROOT}/include)
+    target_link_directories(inference_engine PRIVATE ${ONNXRUNTIME_ROOT}/lib)
+    target_link_libraries(inference_engine PRIVATE onnxruntime)
+    target_compile_definitions(inference_engine PRIVATE HAS_ONNXRUNTIME)
+    message(STATUS "ONNX Runtime linked via ONNXRUNTIME_ROOT")
+else()
+    message(WARNING "ONNX Runtime not found; building without HAS_ONNXRUNTIME")
 endif()
 
 # Link OpenCV if available
 if(OpenCV_FOUND)
-    target_link_libraries(inference_engine ${OpenCV_LIBS})
-    target_link_libraries(InferenceEngine ${OpenCV_LIBS})
-    target_link_libraries(inference_jni ${OpenCV_LIBS})
+    target_link_libraries(inference_engine PRIVATE ${OpenCV_LIBS})
     target_compile_definitions(inference_engine PRIVATE HAS_OPENCV)
+    target_link_libraries(InferenceEngine PRIVATE ${OpenCV_LIBS})
     target_compile_definitions(InferenceEngine PRIVATE HAS_OPENCV)
-    target_compile_definitions(inference_jni PRIVATE HAS_OPENCV)
     message(STATUS "OpenCV linked")
 endif()
 
 # Link CUDA libraries if available
 if(CUDAToolkit_FOUND)
-    target_link_libraries(inference_engine CUDA::cudart)
-    target_link_libraries(InferenceEngine CUDA::cudart)
-    target_link_libraries(inference_jni CUDA::cudart)
+    target_link_libraries(inference_engine PRIVATE CUDA::cudart)
+    target_link_libraries(InferenceEngine PRIVATE CUDA::cudart)
     message(STATUS "CUDA libraries linked")
 endif()
-
-# Set output name for JNI library (Java looks for libinference_engine.so)
-set_target_properties(inference_jni PROPERTIES OUTPUT_NAME inference_engine)

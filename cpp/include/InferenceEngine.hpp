@@ -76,4 +76,9 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
+// Undefine any conflicting macros that might be defined by system headers
+#ifdef initialize
+#undef initialize
+#endif
+
 #endif // INFERENCE_ENGINE_HPP

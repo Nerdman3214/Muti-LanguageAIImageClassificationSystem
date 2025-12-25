@@ -47,8 +47,7 @@ public class AIController {
     }
     
     // Native methods (JNI)
-    public native int predict(float[] logits);
-    public native float[] classifyImage(String imagePath, String modelPath);
+    public native float[] nativeInfer(String imagePath);
     
     /**
      * Classification result structure
@@ -238,7 +237,7 @@ public class AIController {
         if (nativeLibraryLoaded) {
             // Use native C++ inference
             try {
-                float[] probs = classifyImage(imagePath, "../models/resnet50_imagenet.onnx");
+                float[] probs = nativeInfer(imagePath);
                 if (probs != null) {
                     // Get top-5 predictions
                     List<int[]> topK = getTopK(probs, 5);

@@ -1,117 +1,90 @@
 #include <jni.h>
-#include "InferenceEngine.hpp"
+
+// Include standard C++ headers BEFORE anything that might include system headers
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
-/**
- * JNI Bridge - Connects Java AIController to C++ InferenceEngine
- * 
- * These native methods are called from Java using the JNI mechanism.
- * The function names follow the convention: Java_<package>_<class>_<method>
- */
+// Undefine any problematic macros
+#ifdef initialize
+#undef initialize
+#endif
+#ifdef classifyImage  
+#undef classifyImage
+#endif
+#ifdef cleanup
+#undef cleanup
+#endif
 
-// Global engine instance (singleton pattern)
+// Now include our header
+#include "InferenceEngine.hpp"
+
+// Singleton engine reused across JNI calls to avoid reload overhead
 static std::unique_ptr<InferenceEngine> g_engine;
 
-extern "C" {
-
-/**
- * Initialize the inference engine
- * Returns: true if successful
- */
-JNIEXPORT jboolean JNICALL
-Java_ai_controller_NativeInference_initialize(
-    JNIEnv* env,
-    jobject /* this */,
-    jstring modelPath
-) {
-    try {
-        const char* pathChars = env->GetStringUTFChars(modelPath, nullptr);
-        std::string path(pathChars);
-        env->ReleaseStringUTFChars(modelPath, pathChars);
-
-        g_engine = std::make_unique<InferenceEngine>();
-        bool success = g_engine->initialize(path);
-
-        return success ? JNI_TRUE : JNI_FALSE;
-
-    } catch (const std::exception& e) {
-        jclass exClass = env->FindClass("java/lang/RuntimeException");
-        env->ThrowNew(exClass, e.what());
-        return JNI_FALSE;
+// Helper function to throw Java exceptions from C++
+static void throwRuntime(JNIEnv* env, const std::string& message) {
+    jclass exClass = env->FindClass("java/lang/RuntimeException");
+    if (exClass != nullptr) {
+        env->ThrowNew(exClass, message.c_str());
     }
 }
 
-/**
- * Run inference on an image
- * Returns: JSON string with results
- */
-JNIEXPORT jstring JNICALL
-Java_ai_controller_NativeInference_classifyImage(
+namespace {
+
+InferenceEngine& ensureEngine(JNIEnv* env) {
+    if (!g_engine) {
+        g_engine = std::make_unique<InferenceEngine>();
+        if (!g_engine->initialize("models/resnet50_imagenet.onnx")) {
+            throwRuntime(env, "Failed to initialize inference engine");
+            throw std::runtime_error("Engine init failed");
+        }
+    }
+    return *g_engine;
+}
+
+} // namespace
+
+extern "C" {
+
+JNIEXPORT jfloatArray JNICALL
+Java_ai_controller_AIController_nativeInfer(
     JNIEnv* env,
     jobject /* this */,
     jstring imagePath
 ) {
     try {
-        if (!g_engine) {
-            jclass exClass = env->FindClass("java/lang/IllegalStateException");
-            env->ThrowNew(exClass, "Engine not initialized");
+        if (!imagePath) {
+            throwRuntime(env, "imagePath is null");
             return nullptr;
         }
 
         const char* pathChars = env->GetStringUTFChars(imagePath, nullptr);
-        std::string path(pathChars);
+        std::string path(pathChars ? pathChars : "");
         env->ReleaseStringUTFChars(imagePath, pathChars);
 
-        // Run inference
-        auto probabilities = g_engine->classifyImage(path);
+        if (path.empty()) {
+            throwRuntime(env, "imagePath is empty");
+            return nullptr;
+        }
 
-        // Find top prediction
-        auto maxIt = std::max_element(probabilities.begin(), probabilities.end());
-        size_t classIdx = std::distance(probabilities.begin(), maxIt);
-        float confidence = *maxIt;
+        InferenceEngine& engine = ensureEngine(env);
+        std::vector<float> probabilities = engine.classifyImage(path);
 
-        // Build JSON response
-        std::string json = "{"
-            "\"class\":" + std::to_string(classIdx) + ","
-            "\"confidence\":" + std::to_string(confidence) + ","
-            "\"engine\":\"ONNX\","
-            "\"device\":\"GPU\""
-            "}";
+        jfloatArray output = env->NewFloatArray(static_cast<jsize>(probabilities.size()));
+        if (!output) {
+            throwRuntime(env, "Failed to allocate float array for output");
+            return nullptr;
+        }
 
-        return env->NewStringUTF(json.c_str());
+        env->SetFloatArrayRegion(output, 0, static_cast<jsize>(probabilities.size()), probabilities.data());
+        return output;
 
     } catch (const std::exception& e) {
-        jclass exClass = env->FindClass("java/lang/RuntimeException");
-        env->ThrowNew(exClass, e.what());
+        throwRuntime(env, e.what());
         return nullptr;
     }
-}
-
-/**
- * Cleanup resources
- */
-JNIEXPORT void JNICALL
-Java_ai_controller_NativeInference_cleanup(
-    JNIEnv* /* env */,
-    jobject /* this */
-) {
-    g_engine.reset();
-}
-
-/**
- * Get engine version
- */
-JNIEXPORT jstring JNICALL
-Java_ai_controller_NativeInference_getVersion(
-    JNIEnv* env,
-    jobject /* this */
-) {
-    if (g_engine) {
-        return env->NewStringUTF(g_engine->getVersion().c_str());
-    }
-    return env->NewStringUTF("not initialized");
 }
 
 } // extern "C"
