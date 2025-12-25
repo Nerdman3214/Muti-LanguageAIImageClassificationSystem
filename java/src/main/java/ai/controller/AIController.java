@@ -25,7 +25,6 @@ import static spark.Spark.*;
  * 
  * OpenAPI/Swagger compatible
  */
-@Path("/api/v1")
 public class AIController {
     
     private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
