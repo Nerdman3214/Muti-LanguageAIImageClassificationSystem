@@ -1,49 +1,215 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+================================================================================
+pom.xml - Maven Project Object Model Configuration
+================================================================================
+
+MAVEN OVERVIEW:
+Maven is a build automation and dependency management tool for Java.
+It handles:
+1. Dependency downloading (no manual JAR management!)
+2. Compilation
+3. Testing
+4. Packaging (creating JAR/WAR files)
+5. Deployment
+
+POM (Project Object Model):
+This XML file describes everything Maven needs to know about the project:
+- Project identification (groupId, artifactId, version)
+- Dependencies (libraries we use)
+- Build configuration (how to compile and package)
+
+MAVEN COORDINATE SYSTEM:
+Every artifact (JAR) in Maven is identified by three coordinates:
+- groupId: Organization/project (like a package name), e.g., "com.google.code.gson"
+- artifactId: The specific project/library, e.g., "gson"
+- version: Specific version number, e.g., "2.10.1"
+
+MAVEN REPOSITORY:
+Maven automatically downloads dependencies from Maven Central (https://search.maven.org)
+and caches them in ~/.m2/repository/
+
+COMMON MAVEN COMMANDS:
+- mvn clean          : Delete target/ directory (compiled files)
+- mvn compile        : Compile the project
+- mvn test           : Run unit tests
+- mvn package        : Create JAR file
+- mvn clean package  : Clean, then build fresh JAR
+- mvn install        : Install to local repository (~/.m2)
+
+================================================================================
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <!--
+    modelVersion: POM schema version.
+    4.0.0 is the current version used by Maven 2 and 3.
+    This is always 4.0.0 in modern projects.
+    -->
     <modelVersion>4.0.0</modelVersion>
 
+    <!--
+    ============================================================================
+    PROJECT COORDINATES
+    ============================================================================
+    These three elements uniquely identify this project in the Maven ecosystem.
+    -->
+    
+    <!--
+    groupId: Usually your organization's reverse domain name.
+    Convention: com.company.project or org.project
+    Here: ai.controller (matching our Java package structure)
+    -->
     <groupId>ai.controller</groupId>
+    
+    <!--
+    artifactId: The name of this specific project/module.
+    This becomes the base name of the output JAR file.
+    -->
     <artifactId>MultiLanguageAIImageSystem</artifactId>
+    
+    <!--
+    version: Current version of this project.
+    Follows semantic versioning: MAJOR.MINOR.PATCH
+    - MAJOR: Breaking changes
+    - MINOR: New features (backward compatible)
+    - PATCH: Bug fixes
+    
+    SNAPSHOT suffix (e.g., "1.0.0-SNAPSHOT") indicates development version.
+    Without SNAPSHOT, it's a release version.
+    -->
     <version>1.0.0</version>
+    
+    <!--
+    packaging: Output format.
+    - jar: Java ARchive (default) - runnable application or library
+    - war: Web ARchive - for deployment to servlet containers
+    - pom: Parent POM (no output, just config inheritance)
+    -->
     <packaging>jar</packaging>
 
+    <!--
+    Human-readable project information.
+    Shows in IDE tooltips and Maven reports.
+    -->
     <name>Multi-Language AI Image Classification System</name>
     <description>Java REST API for AI image classification with JNI integration</description>
 
+    <!--
+    ============================================================================
+    PROPERTIES
+    ============================================================================
+    Variables that can be referenced elsewhere as ${property.name}
+    This is DRY (Don't Repeat Yourself) - define versions once, use everywhere.
+    -->
     <properties>
+        <!--
+        Java version configuration.
+        source: Java language level for compiling
+        target: JVM version for bytecode compatibility
+        We use Java 21 (LTS release with virtual threads, pattern matching, etc.)
+        -->
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
+        
+        <!--
+        Source file encoding.
+        UTF-8 is the standard for international character support.
+        Prevents "unmappable character" warnings.
+        -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        
+        <!--
+        Dependency versions (referenced below as ${spark.version}, ${gson.version})
+        Centralizing versions here makes upgrades easier.
+        -->
         <spark.version>2.9.4</spark.version>
         <gson.version>2.10.1</gson.version>
     </properties>
 
+    <!--
+    ============================================================================
+    DEPENDENCIES
+    ============================================================================
+    External libraries this project needs.
+    Maven automatically downloads these and their transitive dependencies.
+    -->
     <dependencies>
-        <!-- Spark Java - Lightweight REST framework -->
+        <!--
+        ========================================================================
+        SPARK JAVA - Lightweight REST Framework
+        ========================================================================
+        Spark is a micro web framework (like Flask for Python, Sinatra for Ruby).
+        Minimal boilerplate - just define routes and handlers.
+        
+        Example:
+            get("/hello", (req, res) -> "Hello World");
+        
+        Website: https://sparkjava.com/
+        -->
         <dependency>
             <groupId>com.sparkjava</groupId>
             <artifactId>spark-core</artifactId>
             <version>${spark.version}</version>
+            <!--
+            No <scope> specified = "compile" scope (default)
+            This means it's needed for both compilation and runtime.
+            -->
         </dependency>
         
-        <!-- JSON handling -->
+        <!--
+        ========================================================================
+        GSON - JSON Serialization/Deserialization
+        ========================================================================
+        Google's JSON library. Converts Java objects to/from JSON.
+        
+        Example:
+            Gson gson = new Gson();
+            String json = gson.toJson(myObject);    // Object → JSON string
+            MyClass obj = gson.fromJson(json, MyClass.class);  // JSON → Object
+        
+        We use it to serialize API responses.
+        -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>${gson.version}</version>
         </dependency>
         
-        <!-- SLF4J for Spark logging -->
+        <!--
+        ========================================================================
+        SLF4J - Logging Facade
+        ========================================================================
+        SLF4J (Simple Logging Facade for Java) provides logging abstraction.
+        Spark uses SLF4J internally.
+        
+        slf4j-simple: Basic console output implementation.
+        For production, consider logback or log4j2 for more features.
+        
+        Without this dependency, Spark shows warnings about missing SLF4J binding.
+        -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.9</version>
         </dependency>
         
-        <!-- Testing -->
+        <!--
+        ========================================================================
+        JUNIT - Testing Framework
+        ========================================================================
+        The standard unit testing framework for Java.
+        
+        <scope>test</scope> means:
+        - Only available in src/test/java, not src/main/java
+        - Not included in the final JAR
+        - Only downloaded/used when running tests
+        
+        JUnit 4.13.2 is stable; JUnit 5 (Jupiter) is the modern version.
+        -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -52,8 +218,22 @@
         </dependency>
     </dependencies>
 
+    <!--
+    ============================================================================
+    BUILD CONFIGURATION
+    ============================================================================
+    Customize how Maven builds the project.
+    -->
     <build>
         <plugins>
+            <!--
+            ================================================================
+            MAVEN COMPILER PLUGIN
+            ================================================================
+            Controls Java compilation.
+            Though we set properties above, explicitly configuring the plugin
+            ensures compatibility across different Maven versions.
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -61,26 +241,83 @@
                 <configuration>
                     <source>21</source>
                     <target>21</target>
+                    <!--
+                    Additional useful options:
+                    <compilerArgs>
+                        <arg>-Xlint:all</arg>  Enable all warnings
+                    </compilerArgs>
+                    -->
                 </configuration>
             </plugin>
             
-            <!-- Create executable JAR with dependencies -->
+            <!--
+            ================================================================
+            MAVEN SHADE PLUGIN - Create Fat/Uber JAR
+            ================================================================
+            The Shade plugin creates an "uber JAR" (also called "fat JAR"):
+            - Includes ALL dependencies inside the JAR
+            - Single JAR file that can run anywhere with just `java -jar`
+            - No need to manage classpath or separate dependency JARs
+            
+            Without this, you'd need:
+                java -cp "lib/*:myapp.jar" ai.controller.AIController
+            
+            With uber JAR:
+                java -jar myapp.jar
+            
+            The name "shade" comes from its ability to rename (shade) package
+            names to avoid conflicts between different library versions.
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.1</version>
                 <executions>
+                    <!--
+                    execution: When and how to run this plugin.
+                    -->
                     <execution>
+                        <!--
+                        phase: Maven lifecycle phase when this runs.
+                        "package" means it runs during `mvn package`.
+                        Maven lifecycle: validate → compile → test → package → install → deploy
+                        -->
                         <phase>package</phase>
                         <goals>
+                            <!--
+                            goal: What the plugin should do.
+                            "shade" = create the uber JAR.
+                            -->
                             <goal>shade</goal>
                         </goals>
                         <configuration>
                             <transformers>
+                                <!--
+                                ManifestResourceTransformer: Modifies the JAR's MANIFEST.MF
+                                Sets Main-Class so `java -jar` knows which class to run.
+                                -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <!--
+                                    mainClass: Entry point - the class with main(String[] args).
+                                    This enables: java -jar MultiLanguageAIImageSystem-1.0.0.jar
+                                    -->
                                     <mainClass>ai.controller.AIController</mainClass>
                                 </transformer>
                             </transformers>
+                            <!--
+                            Additional useful options:
+                            <filters>
+                                Exclude signature files from signed JARs (causes errors)
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            -->
                         </configuration>
                     </execution>
                 </executions>
